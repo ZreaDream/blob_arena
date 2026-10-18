@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Blob Arena IO</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#07121d; font-family:system-ui,Segoe UI,Arial,sans-serif; color:#f4fbff; }
+  canvas { display:block; width:100%; height:100%; touch-action:none; }
+  .hud { position:fixed; inset:0; pointer-events:none; }
+  .panel { background:rgba(5,15,26,.78); border:1px solid rgba(143,220,255,.24); box-shadow:0 8px 28px #0005; backdrop-filter:blur(8px); border-radius:14px; }
+  #stats { position:absolute; left:14px; top:14px; padding:10px 14px; min-width:150px; }
+  #stats strong { display:block; font-size:18px; letter-spacing:.4px; }
+  #stats span { font-size:12px; color:#a8c8dc; }
+  #leaderboard { position:absolute; right:14px; top:14px; width:174px; padding:12px; }
+  #leaderboard h3 { margin:0 0 7px; font-size:13px; letter-spacing:1px; color:#9edcff; }
+  .rank { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:3px 0; color:#e8f6ff; }
+  .rank.me { color:#7dffb0; font-weight:800; }
+  #help { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 13px; color:#b7d4e4; font-size:12px; text-align:center; white-space:nowrap; }
+  #startScreen { position:fixed; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:18px; background:radial-gradient(ellipse at center,#102d43dd,#020811f2); }
+  .modal { width:min(420px,100%); text-align:center; padding:28px 24px; border-radius:22px; background:linear-gradient(160deg,#102c40,#081522); border:1px solid #4e9bb755; box-shadow:0 25px 80px #0009; }
+  .logo { font-size:clamp(32px,8vw,48px); font-weight:1000; letter-spacing:-2px; line-height:1; }
+  .logo em { color:#59f0b2; font-style:normal; }
+  .sub { color:#a6c5d7; font-size:14px; margin:12px 0 20px; line-height:1.5; }
+  input { width:100%; border:1px solid #326078; border-radius:12px; background:#071723; color:white; padding:13px; font-size:16px; outline:none; text-align:center; margin-bottom:10px; }
+  button { border:0; border-radius:12px; background:linear-gradient(135deg,#4bf0ad,#18b8d9); color:#04202a; font-size:16px; font-weight:900; padding:13px 18px; width:100%; cursor:pointer; box-shadow:0 5px 18px #1de3bc33; }
+  .small { color:#7899ab; font-size:11px; margin-top:14px; }
+  #mobileHint { display:none; }
+  @media (pointer:coarse) { #help { bottom:12px; white-space:normal; width:90%; } #mobileHint { display:block; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud">
+  <div id="stats" class="panel"><strong id="mass">MASS 100</strong><span id="status">Level 1 · Bertahan hidup!</span></div>
+  <div id="leaderboard" class="panel"><h3>🏆 TOP ARENA</h3><div id="ranks"></div></div>
+</div>
+<div id="startScreen">
+  <div class="modal">
+    <div class="logo">BLOB <em>ARENA</em></div>
+    <div class="sub">Jadilah blob terbesar! Makan orb, tumbuh besar, dan hindari pemain yang lebih kuat.<br><br><span style="color:#7dffb0">Kontrol: arahkan mouse atau sentuh layar untuk bergerak.</span></div>
+    <input id="playerName" maxlength="14" placeholder="Nama blob kamu" value="Pemain">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px;text-align:left">
+      <label style="font-size:12px;color:#a6c5d7">Ukuran arena
+        <select id="arenaSize" style="display:block;width:100%;margin-top:5px;padding:11px;border-radius:10px;background:#071723;color:#fff;border:1px solid #326078;font-size:14px">
+          <option value="small">Kecil</option><option value="medium" selected>Sedang</option><option value="large">Besar</option>
+        </select>
+      </label>
+      <label style="font-size:12px;color:#a6c5d7">Jumlah pemain
+        <select id="playerCount" style="display:block;width:100%;margin-top:5px;padding:11px;border-radius:10px;background:#071723;color:#fff;border:1px solid #326078;font-size:14px">
+          <option value="10">10 pemain</option><option value="20" selected>20 pemain</option><option value="35">35 pemain</option><option value="50">50 pemain</option>
+        </select>
+      </label>
+    </div>
+    <label style="display:block;text-align:left;font-size:12px;color:#a6c5d7;margin-bottom:12px">Kustom warna karakter
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+        <button type="button" class="skinChoice" data-color="#58f0b4" aria-label="Hijau" style="width:42px;height:38px;padding:0;background:#58f0b4;border:3px solid white"></button>
+        <button type="button" class="skinChoice" data-color="#ff6584" aria-label="Merah muda" style="width:42px;height:38px;padding:0;background:#ff6584"></button>
+        <button type="button" class="skinChoice" data-color="#54d8ff" aria-label="Biru" style="width:42px;height:38px;padding:0;background:#54d8ff"></button>
+        <button type="button" class="skinChoice" data-color="#aa85ff" aria-label="Ungu" style="width:42px;height:38px;padding:0;background:#aa85ff"></button>
+        <button type="button" class="skinChoice" data-color="#ffc857" aria-label="Kuning" style="width:42px;height:38px;padding:0;background:#ffc857"></button>
+        <button type="button" class="skinChoice" data-color="#ffffff" aria-label="Putih" style="width:42px;height:38px;padding:0;background:#ffffff"></button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px">
+        <input id="customColor" type="color" value="#58f0b4" aria-label="Pilih warna karakter sendiri" style="width:58px;height:42px;padding:3px;margin:0;cursor:pointer;background:#071723;border:1px solid #326078;border-radius:10px">
+        <span style="font-size:12px;color:#a6c5d7">Atau pilih warna sendiri 🎨</span>
+      </div>
+    </label>
+    <button id="playBtn">MULAI BERMAIN ▶</button>
+    <div class="small">Game HTML offline · Bisa dimainkan di HP dan komputer</div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+const massEl = document.getElementById('mass'), statusEl = document.getElementById('status'), ranksEl = document.getElementById('ranks');
+const WORLD = { w: 3000, h: 2200 };
+let chosenPlayerColor = '#58f0b4';
+let W=innerWidth,H=innerHeight,dpr=1, running=false, dead=false, last=0, elapsed=0, targetBotCount=19;
+let camera={x:0,y:0}, pointer={x:innerWidth/2,y:innerHeight/2, active:false}, player, blobs=[], foods=[], particles=[];
+const colors=['#ff6584','#ffc857','#aa85ff','#54d8ff','#65f0b1','#ff8c42','#f472d0','#a3e635','#60a5fa'];
+function resize(){ W=innerWidth; H=innerHeight; dpr=Math.min(devicePixelRatio||1,2); canvas.width=W*dpr; canvas.height=H*dpr; canvas.style.width=W+'px'; canvas.style.height=H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+addEventListener('resize',resize); resize();
+const rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const radius=b=>Math.sqrt(b.mass)*2.25;
+function makeBlob(x,y,mass,color,name,isPlayer=false){
+ return {x,y,mass,color,name,isPlayer,vx:0,vy:0,aiAngle:rand(0,Math.PI*2),aiTimer:rand(.3,2),score:0};
+}
+function resetWorld(){
+ foods=[]; blobs=[]; particles=[];
+ for(let i=0;i<650;i++) foods.push({x:rand(20,WORLD.w-20),y:rand(20,WORLD.h-20),r:rand(3,6),color:colors[Math.floor(Math.random()*colors.length)]});
+ player=makeBlob(WORLD.w/2,WORLD.h/2,100,chosenPlayerColor,document.getElementById('playerName').value.trim()||'Pemain',true);
+ const totalPlayers = Number(document.getElementById('playerCount').value) || 20;
+ targetBotCount=Math.max(1,totalPlayers-1);
+ for(let i=0;i<targetBotCount;i++) spawnBot(i);
+ camera.x=player.x;camera.y=player.y; dead=false; elapsed=0;
+}
+function spawnBot(i=blobs.length){
+ let x,y,tries=0; do{x=rand(80,WORLD.w-80);y=rand(80,WORLD.h-80);tries++;}while(Math.hypot(x-player.x,y-player.y)<Math.min(450,Math.min(WORLD.w,WORLD.h)*.24)&&tries<80);
+ const names=['Nova','Kiko','Mochi','Zappy','Pixel','Boba','Rex','Luna','Taro','Mika','Comet','Puff','Nori','Echo','Kiwi','Dino','Jelly','Bolt','Mimi'];
+ blobs.push(makeBlob(x,y,rand(70,500),colors[Math.floor(Math.random()*colors.length)],names[i%names.length]||('Bot-'+(i+1))));
+}
+function start(){
+ document.querySelector('.logo').innerHTML='BLOB <em>ARENA</em>';
+ document.querySelector('.sub').innerHTML='Jadilah blob terbesar! Makan orb, tumbuh besar, dan hindari pemain yang lebih kuat.<br><br><span style="color:#7dffb0">Kontrol: arahkan mouse atau sentuh layar untuk bergerak.</span>';
+ const arenaChoice=document.getElementById('arenaSize').value;
+ if(arenaChoice==='small'){WORLD.w=1800;WORLD.h=1300;}
+ else if(arenaChoice==='large'){WORLD.w=4600;WORLD.h=3300;}
+ else {WORLD.w=3000;WORLD.h=2200;}
+ resetWorld();running=true;document.getElementById('startScreen').style.display='none';last=performance.now();requestAnimationFrame(loop);}
+document.getElementById('playBtn').addEventListener('click',start);
+document.getElementById('customColor').addEventListener('input',e=>{
+ chosenPlayerColor=e.target.value;
+ document.querySelectorAll('.skinChoice').forEach(b=>b.style.outline='none');
+});
+document.querySelectorAll('.skinChoice').forEach(btn=>btn.addEventListener('click',()=>{
+ chosenPlayerColor=btn.dataset.color;
+ document.querySelectorAll('.skinChoice').forEach(b=>b.style.outline='none');
+ btn.style.outline='3px solid #ffffff';
+ btn.style.outlineOffset='2px';
+}));
+
+document.getElementById('playerName').addEventListener('keydown',e=>{if(e.key==='Enter')start();});
+canvas.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.clientY;pointer.active=true;});
+canvas.addEventListener('pointerdown',e=>{pointer.x=e.clientX;pointer.y=e.clientY;pointer.active=true;});
+canvas.addEventListener('pointerup',()=>{pointer.active=false;});
+canvas.addEventListener('pointercancel',()=>{pointer.active=false;});
+function worldAt(sx,sy){return {x:sx+camera.x-W/2,y:sy+camera.y-H/2};}
+function burst(x,y,color,n=8){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-100,100),vy:rand(-100,100),life:rand(.25,.65),max:.65,color});}
+function eatBlob(eater,victim){
+ eater.mass+=victim.mass*.72; burst(victim.x,victim.y,victim.color,20);
+ if(victim.isPlayer){dead=true;running=false;document.getElementById('startScreen').style.display='flex';document.querySelector('.logo').innerHTML='KAMU <em>DIMAKAN!</em>';document.querySelector('.sub').textContent='Blob kamu dimakan. Massa akhir: '+Math.floor(player.mass)+'. Coba lagi dan jadilah yang terbesar!';document.getElementById('playBtn').textContent='MAIN LAGI ↻';}
+}
+function moveBlob(b,dt){
+ if(b.isPlayer){
+   const target=worldAt(pointer.x,pointer.y), dx=target.x-b.x,dy=target.y-b.y,dist=Math.hypot(dx,dy)||1;
+   const speed=clamp(230/(1+radius(b)*.012),55,210);
+   b.vx+=(dx/dist*speed-b.vx)*Math.min(1,dt*5); b.vy+=(dy/dist*speed-b.vy)*Math.min(1,dt*5);
+ } else {
+   b.aiTimer-=dt;
+   if(b.aiTimer<=0){b.aiAngle=rand(0,Math.PI*2);b.aiTimer=rand(.12,.38);}
+   let tx=Math.cos(b.aiAngle),ty=Math.sin(b.aiAngle);
+   let prey=null, preyDist=Infinity, threat=null, threatDist=Infinity, food=null, foodDist=Infinity;
+   for(const other of [player,...blobs]){
+     if(other===b)continue;
+     const d=Math.hypot(other.x-b.x,other.y-b.y);
+     if(other.mass < b.mass*.88 && d < preyDist){prey=other;preyDist=d;}
+     if(other.mass > b.mass*1.08 && d < threatDist){threat=other;threatDist=d;}
+   }
+   // Prioritaskan kabur dari pemburu, lalu berburu target yang lebih kecil.
+   if(threat && threatDist < 390 && (!prey || threatDist < preyDist*.8)){
+     tx=(b.x-threat.x)/(threatDist||1);ty=(b.y-threat.y)/(threatDist||1);
+   } else if(prey && preyDist < 900){
+     tx=(prey.x-b.x)/(preyDist||1);ty=(prey.y-b.y)/(preyDist||1);
+   } else {
+     // Cari orb terdekat supaya bot tidak cuma muter atau terjebak di sudut.
+     for(const f of foods){const d=Math.hypot(f.x-b.x,f.y-b.y);if(d<foodDist){food=f;foodDist=d;}}
+     if(food && foodDist<650){tx=(food.x-b.x)/(foodDist||1);ty=(food.y-b.y)/(foodDist||1);}
+   }
+   // Dorongan kuat ke tengah saat mendekati tepi arena, mencegah bot mentok di pojok.
+   const edgeX=Math.min(b.x,WORLD.w-b.x), edgeY=Math.min(b.y,WORLD.h-b.y);
+   const steerX=edgeX<260?(WORLD.w/2-b.x)/Math.max(1,Math.abs(WORLD.w/2-b.x)):0;
+   const steerY=edgeY<260?(WORLD.h/2-b.y)/Math.max(1,Math.abs(WORLD.h/2-b.y)):0;
+   tx+=steerX*(edgeX<100?4:2);ty+=steerY*(edgeY<100?4:2);
+   const len=Math.hypot(tx,ty)||1;tx/=len;ty/=len;
+   const wobble=rand(-.09,.09), ang=Math.atan2(ty,tx)+wobble;tx=Math.cos(ang);ty=Math.sin(ang);
+   // Kecepatan bot AI diperlambat
+const speed = clamp(160 / (1 + radius(b) * 0.007), 58, 125);
+
+b.vx += (tx * speed - b.vx) * Math.min(1, dt * 5);
+b.vy += (ty * speed - b.vy) * Math.min(1, dt * 5);
+ }
+ b.x=clamp(b.x+b.vx*dt,radius(b),WORLD.w-radius(b));b.y=clamp(b.y+b.vy*dt,radius(b),WORLD.h-radius(b));
+}
+function update(dt){
+ elapsed+=dt; moveBlob(player,dt); for(const b of blobs)moveBlob(b,dt);
+ for(let i=foods.length-1;i>=0;i--){const f=foods[i];for(const b of [player,...blobs]){if(Math.hypot(f.x-b.x,f.y-b.y)<radius(b)+f.r*.65){b.mass+=.8; if(b.isPlayer)b.score++;foods.splice(i,1);foods.push({x:rand(20,WORLD.w-20),y:rand(20,WORLD.h-20),r:rand(3,6),color:colors[Math.floor(Math.random()*colors.length)]});break;}}}
+ const all=[player,...blobs];
+ // Bot AI can now eat the human player when it is sufficiently larger and collides.
+ for(const b of blobs){
+   if(!dead && b.mass>player.mass*1.12 && Math.hypot(b.x-player.x,b.y-player.y)<radius(b)-radius(player)*.25){
+     eatBlob(b,player);
+     break;
+   }
+ }
+ if(dead)return;
+ for(let i=blobs.length-1;i>=0;i--){const b=blobs[i];if(player.mass>b.mass*1.12&&Math.hypot(player.x-b.x,player.y-b.y)<radius(player)-radius(b)*.25){eatBlob(player,b);blobs.splice(i,1);spawnBot(Math.floor(rand(0,999)));}}
+ for(let i=0;i<blobs.length;i++)for(let j=i+1;j<blobs.length;j++){let a=blobs[i],b=blobs[j],d=Math.hypot(a.x-b.x,a.y-b.y);if(d<radius(a)-radius(b)*.25&&a.mass>b.mass*1.12){a.mass+=b.mass*.7;blobs.splice(j,1);j--;spawnBot(Math.floor(rand(0,999)));}}
+ // Jaga jumlah bot tetap sesuai pilihan awal walau ada bot yang mati.
+ while(blobs.length<targetBotCount)spawnBot(Math.floor(rand(0,999)));
+ if(blobs.length>targetBotCount)blobs.length=targetBotCount;
+ for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1);}
+ camera.x+=(player.x-camera.x)*Math.min(1,dt*4);camera.y+=(player.y-camera.y)*Math.min(1,dt*4);
+ massEl.textContent='MASS '+Math.floor(player.mass);statusEl.textContent='Orb dimakan: '+player.score+' · '+Math.floor(elapsed)+' dtk';
+ const ranks=[player,...blobs].sort((a,b)=>b.mass-a.mass).slice(0,5);
+ ranksEl.innerHTML=ranks.map((b,i)=>`<div class="rank ${b.isPlayer?'me':''}"><span>${i+1}. ${escapeHtml(b.name)}${b.isPlayer?' (Kamu)':''}</span><span>${Math.floor(b.mass)}</span></div>`).join('');
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function drawBlob(b){
+ const x=b.x-camera.x+W/2,y=b.y-camera.y+H/2,r=radius(b);
+ ctx.save();ctx.shadowColor=b.color;ctx.shadowBlur=14;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+ ctx.globalAlpha=.25;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x-r*.25,y-r*.3,r*.52,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+ ctx.fillStyle='#06202b';const eyeY=y-r*.08, eyeOff=r*.22, er=Math.max(2,r*.09);ctx.beginPath();ctx.arc(x-eyeOff,eyeY,er,0,Math.PI*2);ctx.arc(x+eyeOff,eyeY,er,0,Math.PI*2);ctx.fill();
+ ctx.font=`${Math.max(10,Math.min(15,r*.35))}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#f4fbff';ctx.shadowColor='#000';ctx.shadowBlur=4;ctx.fillText(b.name,x,y+r+15);ctx.shadowBlur=0;
+ if(b.isPlayer){ctx.strokeStyle='#c8ffeb';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r+4,0,Math.PI*2);ctx.stroke();}
+ ctx.restore();
+}
+function render(){
+ ctx.clearRect(0,0,W,H);ctx.fillStyle='#07121d';ctx.fillRect(0,0,W,H);
+ const ox=W/2-camera.x,oy=H/2-camera.y, grid=60;
+ ctx.strokeStyle='rgba(87,153,184,.10)';ctx.lineWidth=1;ctx.beginPath();
+ for(let x=Math.floor((camera.x-W/2)/grid)*grid;x<camera.x+W/2+grid;x+=grid){ctx.moveTo(x+ox,0);ctx.lineTo(x+ox,H);}
+ for(let y=Math.floor((camera.y-H/2)/grid)*grid;y<camera.y+H/2+grid;y+=grid){ctx.moveTo(0,y+oy);ctx.lineTo(W,y+oy);}ctx.stroke();
+ ctx.strokeStyle='#34718a';ctx.lineWidth=5;ctx.strokeRect(ox,oy,WORLD.w,WORLD.h);
+ for(const f of foods){const x=f.x+ox,y=f.y+oy;if(x<-10||x>W+10||y<-10||y>H+10)continue;ctx.fillStyle=f.color;ctx.globalAlpha=.9;ctx.beginPath();ctx.arc(x,y,f.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+ for(const b of blobs)drawBlob(b);if(player)drawBlob(player);
+ for(const p of particles){ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x+ox,p.y+oy,3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+ // Small minimap
+ const mw=104,mh=76,mx=W-mw-16,my=H-mh-16;ctx.fillStyle='#06101acc';ctx.fillRect(mx,my,mw,mh);ctx.strokeStyle='#5e9bb0';ctx.strokeRect(mx,my,mw,mh);
+ for(const b of blobs){ctx.fillStyle=b.color;ctx.fillRect(mx+b.x/WORLD.w*mw-1,my+b.y/WORLD.h*mh-1,3,3);}
+ ctx.fillStyle='#fff';ctx.fillRect(mx+player.x/WORLD.w*mw-2,my+player.y/WORLD.h*mh-2,5,5);
+}
+function loop(now){if(!running)return;const dt=Math.min((now-last)/1000,.04);last=now;update(dt);render();requestAnimationFrame(loop);}
+})();
+</script>
+</body>
+</html>
